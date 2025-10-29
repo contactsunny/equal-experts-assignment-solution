@@ -27,44 +27,35 @@ def validate_file_has_required_columns(file_path: str) -> bool:
     return False
 
 def create_stage_table_from_file(file_path: str, conn: duckdb.Connection) -> None:
-    try:
-        columns = [desc[0] for desc in conn.description]
-        
-        # Using default values if these columns are not present in the input file.
-        user_id_expr = "CAST(UserId AS STRING)" if "UserId" in columns else "CAST('' AS STRING)"
-        bounty_amount_expr = "CAST(BountyAmount AS DOUBLE)" if "BountyAmount" in columns else "CAST(0.0 AS DOUBLE)"
-        
-        stage_table_query = f"""
-            CREATE OR REPLACE TABLE {SCHEMA_NAME}.{STAGE_TABLE_NAME} AS
-            SELECT id, user_id, post_id, vote_type_id, bounty_amount, creation_date FROM (
-                SELECT CAST(Id AS STRING) AS id, 
-                {user_id_expr} AS user_id, 
-                CAST(PostId AS STRING) AS post_id, 
-                CAST(VoteTypeId AS INTEGER) AS vote_type_id, 
-                {bounty_amount_expr} AS bounty_amount,
+    stage_table_query = f"""
+        CREATE OR REPLACE TABLE {SCHEMA_NAME}.{STAGE_TABLE_NAME} AS
+        WITH raw AS (
+            SELECT * FROM
+            read_json_auto(
+                '{file_path}',
+                columns={{
+                    'Id': 'STRING',
+                    'UserId': 'STRING',
+                    'PostId': 'STRING',
+                    'VoteTypeId': 'INTEGER',
+                    'BountyAmount': 'DOUBLE',
+                    'CreationDate': 'TIMESTAMP'
+                }}
+            )
+        )
+        SELECT id, user_id, post_id, vote_type_id, bounty_amount, creation_date FROM (
+        SELECT CAST(Id AS STRING) AS id,
+                CAST(UserId AS STRING) AS user_id,
+                CAST(PostId AS STRING) AS post_id,
+                CAST(VoteTypeId AS INTEGER) AS vote_type_id,
+                CAST(BountyAmount AS DOUBLE) AS bounty_amount,
                 CAST(CreationDate AS TIMESTAMP) AS creation_date,
                 ROW_NUMBER() OVER (PARTITION BY id ORDER BY creation_date DESC) AS row_number
-                FROM read_json_auto('{file_path}')
-            ) a WHERE a.row_number = 1;
-        """
-        conn.execute(stage_table_query)
-        
-    except Exception:
-        # Fallback
-        stage_table_query = f"""
-            CREATE OR REPLACE TABLE {SCHEMA_NAME}.{STAGE_TABLE_NAME} AS
-            SELECT id, user_id, post_id, vote_type_id, bounty_amount, creation_date FROM (
-                SELECT CAST(Id AS STRING) AS id, 
-                CAST('' AS STRING) AS user_id, 
-                CAST(PostId AS STRING) AS post_id, 
-                CAST(VoteTypeId AS INTEGER) AS vote_type_id, 
-                CAST(0.0 AS DOUBLE) AS bounty_amount,
-                CAST(CreationDate AS TIMESTAMP) AS creation_date,
-                ROW_NUMBER() OVER (PARTITION BY id ORDER BY creation_date DESC) AS row_number
-                FROM read_json_auto('{file_path}')
-            ) a WHERE a.row_number = 1;
-        """
-        conn.execute(stage_table_query)
+        FROM raw
+        ) a WHERE a.row_number = 1;
+    """
+
+    conn.execute(stage_table_query)
 
 def update_main_table_from_stage_table(conn: duckdb.Connection) -> None:
     insert_query = f"""
@@ -87,6 +78,14 @@ def drop_stage_table(conn: duckdb.Connection) -> None:
     """
     conn.execute(drop_query)
 
+def test_data(file_path: str, conn: duckdb.Connection) -> None:
+    query = f"select * FROM read_json_auto('{file_path}')"
+    result = conn.execute(query).fetchdf()
+    print(result)
+    columns = [desc[0] for desc in conn.description]
+    print(conn.description)
+    print(columns)
+
 def ingest_data(file_path: str, conn: duckdb.Connection) -> None:
     if not validate_file_has_required_columns(file_path):
         raise ValueError(f"File {file_path} does not have required columns for ingestion")
@@ -103,3 +102,4 @@ if __name__ == "__main__":
     with get_connection() as conn:
         setup_schema_and_table(conn)
         ingest_data(sys.argv[FILE_PATH_ARGUMENT_INDEX], conn)
+        # test_data(sys.argv[FILE_PATH_ARGUMENT_INDEX], conn)
