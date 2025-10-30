@@ -1,4 +1,3 @@
-import subprocess
 import duckdb
 import os
 import unittest
@@ -85,23 +84,12 @@ class TestOutlierCalculationIntegration(unittest.TestCase):
             os.remove(WAREHOUSE_PATH)
 
     def test_outlier_calculation_is_correct_for_sample_data(self):
-        # ingest_result = subprocess.run(
-        #     args=[
-        #         "python",
-        #         "-m",
-        #         "equalexperts_dataeng_exercise.ingest",
-        #         "tests/test-resources/samples-votes.jsonl",
-        #     ],
-        #     capture_output=True,
-        # )
         start_ingestion(WAREHOUSE_PATH, "tests/test-resources/samples-votes.jsonl")
-
-        # assert ingest_result.returncode == 0, f"Ingestion passed: {ingest_result.stderr.decode()}"
 
         compute_outliers(WAREHOUSE_PATH)
 
         sql = "SELECT * FROM blog_analysis.outlier_weeks;"
-        con = duckdb.connect("test_warehouse.db", read_only=True)
+        con = duckdb.connect(WAREHOUSE_PATH, read_only=True)
         query_result = con.sql(sql)
         actual_results = query_result.fetchall()
         con.close()
