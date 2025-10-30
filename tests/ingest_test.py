@@ -1,4 +1,3 @@
-import pytest
 import unittest
 import os
 import subprocess
@@ -71,7 +70,7 @@ class TestValidateFileHasRequiredColumns(unittest.TestCase):
         with patch('builtins.open', mock_open(read_data=json.dumps(test_data))):
             result = validate_file_has_required_columns("test_file.json")
             assert result is True
-    
+
     def test_validate_file_has_required_columns_with_empty_file_returns_false(self):
         with patch('builtins.open', mock_open(read_data="")):
             result = validate_file_has_required_columns("empty_file.json")
@@ -250,11 +249,3 @@ class TestIngestionIntegration(unittest.TestCase):
 
         assert result.returncode != 0
 
-
-@pytest.fixture(autouse=True)
-def delete_existing_db():
-    if os.path.exists("warehouse.db"):
-        os.remove("warehouse.db")
-    yield
-    if os.path.exists("warehouse.db"):
-        os.remove("warehouse.db")
