@@ -44,14 +44,14 @@ def create_stage_table_from_file(file_path: str, conn: duckdb.Connection) -> Non
             )
         )
         SELECT id, user_id, post_id, vote_type_id, bounty_amount, creation_date FROM (
-        SELECT CAST(Id AS STRING) AS id,
-                CAST(UserId AS STRING) AS user_id,
-                CAST(PostId AS STRING) AS post_id,
-                CAST(VoteTypeId AS INTEGER) AS vote_type_id,
-                CAST(BountyAmount AS DOUBLE) AS bounty_amount,
-                CAST(CreationDate AS TIMESTAMP) AS creation_date,
-                ROW_NUMBER() OVER (PARTITION BY id ORDER BY creation_date DESC) AS row_number
-        FROM raw
+            SELECT CAST(Id AS STRING) AS id,
+                    CAST(UserId AS STRING) AS user_id,
+                    CAST(PostId AS STRING) AS post_id,
+                    CAST(VoteTypeId AS INTEGER) AS vote_type_id,
+                    CAST(BountyAmount AS DOUBLE) AS bounty_amount,
+                    CAST(CreationDate AS TIMESTAMP) AS creation_date,
+                    ROW_NUMBER() OVER (PARTITION BY id ORDER BY creation_date DESC) AS row_number
+            FROM raw
         ) a WHERE a.row_number = 1;
     """
 
@@ -92,7 +92,7 @@ def ingest_data(file_path: str, conn: duckdb.Connection) -> None:
 
     create_stage_table_from_file(file_path, conn)
     update_main_table_from_stage_table(conn)
-    drop_stage_table(conn)
+    # drop_stage_table(conn)
 
 
 if __name__ == "__main__":

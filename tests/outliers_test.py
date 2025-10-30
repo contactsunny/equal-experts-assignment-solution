@@ -1,4 +1,3 @@
-import pytest
 import subprocess
 import duckdb
 import os
@@ -37,12 +36,12 @@ class TestCreateOutliersView(unittest.TestCase):
 class TestOutliersIntegration(unittest.TestCase):
 
     def setUp(self):
-        if os.path.exists("warehouse.db"):
-            os.remove("warehouse.db")
+        if os.path.exists("test_warehouse.db"):
+            os.remove("test_warehouse.db")
     
     def tearDown(self):
-        if os.path.exists("warehouse.db"):
-            os.remove("warehouse.db")
+        if os.path.exists("test_warehouse.db"):
+            os.remove("test_warehouse.db")
     
     def test_create_outliers_view_creates_view_successfully(self):
         
@@ -75,12 +74,12 @@ class TestOutliersIntegration(unittest.TestCase):
 class TestOutlierCalculationIntegration(unittest.TestCase):
 
     def setUp(self):
-        if os.path.exists("warehouse.db"):
-            os.remove("warehouse.db")
+        if os.path.exists("test_warehouse.db"):
+            os.remove("test_warehouse.db")
 
     def tearDown(self):
-        if os.path.exists("warehouse.db"):
-            os.remove("warehouse.db")
+        if os.path.exists("test_warehouse.db"):
+            os.remove("test_warehouse.db")
 
     def test_outlier_calculation_is_correct_for_sample_data(self):
         ingest_result = subprocess.run(
@@ -107,7 +106,7 @@ class TestOutlierCalculationIntegration(unittest.TestCase):
         assert outliers_result.returncode == 0, f"Outliers analysis failed: {outliers_result.stderr.decode()}"
 
         sql = "SELECT * FROM blog_analysis.outlier_weeks;"
-        con = duckdb.connect("warehouse.db", read_only=True)
+        con = duckdb.connect("test_warehouse.db", read_only=True)
         query_result = con.sql(sql)
         actual_results = query_result.fetchall()
         con.close()
@@ -117,12 +116,3 @@ class TestOutlierCalculationIntegration(unittest.TestCase):
         ]
 
         assert actual_results == expected_results, "Expected view 'outlier_weeks' to have correct output for sample data"
-
-
-@pytest.fixture(autouse=True)
-def delete_existing_db():
-    if os.path.exists("warehouse.db"):
-        os.remove("warehouse.db")
-    yield
-    if os.path.exists("warehouse.db"):
-        os.remove("warehouse.db")

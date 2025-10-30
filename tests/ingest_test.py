@@ -151,12 +151,12 @@ def _count_unique_rows_in_data_file(file_path):
 class TestIngestionIntegration(unittest.TestCase):
 
     def setUp(self):
-        if os.path.exists("warehouse.db"):
-            os.remove("warehouse.db")
+        if os.path.exists("test_warehouse.db"):
+            os.remove("test_warehouse")
     
     def tearDown(self):
-        if os.path.exists("warehouse.db"):
-            os.remove("warehouse.db")
+        if os.path.exists("test_warehouse"):
+            os.remove("test_warehouse")
     
     def test_ingestion_failure_on_missing_column_in_file(self):
         file_path = "tests/test-resources/samples-votes-with-missing-fields.jsonl"
@@ -183,7 +183,10 @@ class TestIngestionIntegration(unittest.TestCase):
         result = validate_file_has_required_columns(file_path)
         assert result is True
 
-    def test_ingestion_completion_with_valid_sample_data(self):
+    @patch('equalexperts_dataeng_exercise.db.WAREHOUSE_PATH')
+    def test_ingestion_completion_with_valid_sample_data(self, WAREHOUSE_PATH):
+        mock = Mock()
+        mock.return_value = "test_warehouse.db"
         file_path = "tests/test-resources/samples-votes.jsonl"
         if not os.path.exists(file_path):
             self.skipTest(f"Test file {file_path} not found")
@@ -223,11 +226,11 @@ class TestIngestionIntegration(unittest.TestCase):
         
         assert result.returncode == 0
 
-        if os.path.exists("warehouse.db"):
+        if os.path.exists("test_warehouse"):
             sql = """
                 SELECT COUNT(*) FROM blog_analysis.votes;
             """
-            conn = duckdb.connect("warehouse.db", read_only=True)
+            conn = duckdb.connect("test_warehouse", read_only=True)
             query_result = conn.sql(sql)
             expected_count = _count_unique_rows_in_data_file(file_path)
             actual_count = query_result.fetchall()[0][0]

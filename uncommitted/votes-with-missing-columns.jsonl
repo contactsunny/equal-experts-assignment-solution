@@ -1,0 +1,15 @@
+{"Id":"1","PostId":"1","VoteTypeId":"2","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"2","PostId":"1","VoteTypeId":"2","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"4","PostId":"1","VoteTypeId":"2","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"5","PostId":"1","VoteTypeId":"2","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"6","PostId":"5","VoteTypeId":"3","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"7","PostId":"3","VoteTypeId":"2","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"8","PostId":"4","VoteTypeId":"2","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"9","PostId":"2","VoteTypeId":"2","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"10","PostId":"2","VoteTypeId":"2","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"11","PostId":"1","VoteTypeId":"2","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"25","UserId":"57","PostId":"14","VoteTypeId":"5","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"118","UserId":"15","PostId":"10","VoteTypeId":"5","CreationDate":"2017-02-28T00:00:00.000"}
+{"Id":"6364","UserId":"14","PostId":"742","VoteTypeId":"8","BountyAmount":"50","CreationDate":"2017-05-21T00:00:00.000"}
+{"Id":"6404","PostId":"1220","VoteTypeId":"9","BountyAmount":"50","CreationDate":"2017-05-22T00:00:00.000"}
+{"Id":"6543","PostId":"1232","VoteTypeId":"9","BountyAmount":"50","CreationDate":"2017-05-31T00:00:00.000"}
