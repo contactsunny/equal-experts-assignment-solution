@@ -1,5 +1,5 @@
 import duckdb
-from equalexperts_dataeng_exercise.db import get_connection, SCHEMA_NAME, MAIN_TABLE_NAME
+from equalexperts_dataeng_exercise.db import get_connection, SCHEMA_NAME, MAIN_TABLE_NAME, WAREHOUSE_PATH
 
 OUTLIER_WEEKS_VIEW_NAME = "outlier_weeks"
 OUTLIER_THRESHOLD = 0.2
@@ -33,8 +33,10 @@ def create_outliers_view(conn: duckdb.Connection) -> None:
 def get_outlier_weeks(conn: duckdb.Connection) -> None:
     print(conn.sql(f"SELECT * FROM {SCHEMA_NAME}.{OUTLIER_WEEKS_VIEW_NAME}").fetchdf())
 
-
-if __name__ == "__main__":
-    with get_connection() as conn:
+def compute_outliers(warehouse_path: str) -> None:
+    with get_connection(warehouse_path) as conn:
         create_outliers_view(conn)
         get_outlier_weeks(conn)
+
+if __name__ == "__main__":
+    compute_outliers(WAREHOUSE_PATH)

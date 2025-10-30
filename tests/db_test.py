@@ -3,10 +3,10 @@ from unittest.mock import Mock, patch
 from equalexperts_dataeng_exercise.db import (
     get_connection,
     setup_schema_and_table,
-    WAREHOUSE_PATH,
     SCHEMA_NAME,
     MAIN_TABLE_NAME
 )
+WAREHOUSE_PATH = "test_warehouse.db"
 
 
 class TestGetConnection(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestGetConnection(unittest.TestCase):
         mock_conn = Mock()
         mock_connect.return_value = mock_conn
         
-        result = get_connection()
+        result = get_connection(WAREHOUSE_PATH)
         
         mock_connect.assert_called_once_with(WAREHOUSE_PATH)
         assert result == mock_conn

@@ -2,7 +2,8 @@ import sys
 import os
 import duckdb
 import json
-from equalexperts_dataeng_exercise.db import get_connection, setup_schema_and_table, SCHEMA_NAME, MAIN_TABLE_NAME
+from equalexperts_dataeng_exercise.db import get_connection, setup_schema_and_table, SCHEMA_NAME, MAIN_TABLE_NAME, \
+    WAREHOUSE_PATH
 
 ARGUMENTS_COUNT = 2
 FILE_PATH_ARGUMENT_INDEX = 1
@@ -26,7 +27,7 @@ def validate_file_has_required_columns(file_path: str) -> bool:
             return all(col in columns for col in required_columns)
     return False
 
-def create_stage_table_from_file(file_path: str, conn: duckdb.Connection) -> None:
+def create_stage_table_from_file(file_path: str, conn: duckdb.DuckDBPyConnection) -> None:
     stage_table_query = f"""
         CREATE OR REPLACE TABLE {SCHEMA_NAME}.{STAGE_TABLE_NAME} AS
         WITH raw AS (
@@ -57,7 +58,7 @@ def create_stage_table_from_file(file_path: str, conn: duckdb.Connection) -> Non
 
     conn.execute(stage_table_query)
 
-def update_main_table_from_stage_table(conn: duckdb.Connection) -> None:
+def update_main_table_from_stage_table(conn: duckdb.DuckDBPyConnection) -> None:
     insert_query = f"""
         INSERT OR REPLACE INTO {SCHEMA_NAME}.{MAIN_TABLE_NAME} 
             (id, user_id, post_id, vote_type_id, bounty_amount, creation_date)
@@ -72,21 +73,13 @@ def update_main_table_from_stage_table(conn: duckdb.Connection) -> None:
     """
     conn.execute(insert_query)
     
-def drop_stage_table(conn: duckdb.Connection) -> None:
+def drop_stage_table(conn: duckdb.DuckDBPyConnection) -> None:
     drop_query = f"""
         DROP TABLE IF EXISTS {SCHEMA_NAME}.{STAGE_TABLE_NAME};
     """
     conn.execute(drop_query)
 
-def test_data(file_path: str, conn: duckdb.Connection) -> None:
-    query = f"select * FROM read_json_auto('{file_path}')"
-    result = conn.execute(query).fetchdf()
-    print(result)
-    columns = [desc[0] for desc in conn.description]
-    print(conn.description)
-    print(columns)
-
-def ingest_data(file_path: str, conn: duckdb.Connection) -> None:
+def ingest_data(file_path: str, conn: duckdb.DuckDBPyConnection) -> None:
     if not validate_file_has_required_columns(file_path):
         raise ValueError(f"File {file_path} does not have required columns for ingestion")
 
@@ -94,12 +87,16 @@ def ingest_data(file_path: str, conn: duckdb.Connection) -> None:
     update_main_table_from_stage_table(conn)
     # drop_stage_table(conn)
 
+def start_ingestion(warehouse_path: str, file_path: str) -> None:
+    with get_connection(warehouse_path) as conn:
+        setup_schema_and_table(conn)
+        ingest_data(file_path, conn)
+        # test_data(sys.argv[FILE_PATH_ARGUMENT_INDEX], conn)
+
+
 
 if __name__ == "__main__":
     validate_arguments(sys.argv)
     validate_file_path(sys.argv[FILE_PATH_ARGUMENT_INDEX])
-    
-    with get_connection() as conn:
-        setup_schema_and_table(conn)
-        ingest_data(sys.argv[FILE_PATH_ARGUMENT_INDEX], conn)
-        # test_data(sys.argv[FILE_PATH_ARGUMENT_INDEX], conn)
+
+    start_ingestion(WAREHOUSE_PATH, sys.argv[FILE_PATH_ARGUMENT_INDEX])

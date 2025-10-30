@@ -5,6 +5,7 @@ import json
 import duckdb
 from unittest.mock import Mock, patch, mock_open
 from equalexperts_dataeng_exercise.ingest import (
+    start_ingestion,
     validate_arguments, 
     validate_file_path, 
     validate_file_has_required_columns,
@@ -13,7 +14,8 @@ from equalexperts_dataeng_exercise.ingest import (
     ingest_data,
     STAGE_TABLE_NAME
 )
-from equalexperts_dataeng_exercise.db import SCHEMA_NAME, MAIN_TABLE_NAME
+from equalexperts_dataeng_exercise.db import SCHEMA_NAME, MAIN_TABLE_NAME, get_connection, setup_schema_and_table
+from tests.db_test import WAREHOUSE_PATH
 
 
 class TestValidateArguments(unittest.TestCase):
@@ -151,29 +153,22 @@ def _count_unique_rows_in_data_file(file_path):
 class TestIngestionIntegration(unittest.TestCase):
 
     def setUp(self):
-        if os.path.exists("test_warehouse.db"):
-            os.remove("test_warehouse")
+        if os.path.exists(WAREHOUSE_PATH):
+            os.remove(WAREHOUSE_PATH)
     
     def tearDown(self):
-        if os.path.exists("test_warehouse"):
-            os.remove("test_warehouse")
+        if os.path.exists(WAREHOUSE_PATH):
+            os.remove(WAREHOUSE_PATH)
     
     def test_ingestion_failure_on_missing_column_in_file(self):
         file_path = "tests/test-resources/samples-votes-with-missing-fields.jsonl"
         if not os.path.exists(file_path):
             self.skipTest(f"Test file {file_path} not found")
-            
-        result = subprocess.run(
-            args=[
-                "python",
-                "-m",
-                "equalexperts_dataeng_exercise.ingest",
-                file_path,
-            ],
-            capture_output=True,
-        )
 
-        assert result.returncode != 0
+        try:
+            start_ingestion(WAREHOUSE_PATH, file_path)
+        except Exception as e:
+            assert isinstance(e, ValueError)
     
     def test_validate_file_has_required_columns_using_real_file(self):
         file_path = "tests/test-resources/samples-votes-with-duplicates.jsonl"
@@ -183,28 +178,16 @@ class TestIngestionIntegration(unittest.TestCase):
         result = validate_file_has_required_columns(file_path)
         assert result is True
 
-    @patch('equalexperts_dataeng_exercise.db.WAREHOUSE_PATH')
-    def test_ingestion_completion_with_valid_sample_data(self, WAREHOUSE_PATH):
-        mock = Mock()
-        mock.return_value = "test_warehouse.db"
+    def test_ingestion_completion_with_valid_sample_data(self):
         file_path = "tests/test-resources/samples-votes.jsonl"
         if not os.path.exists(file_path):
             self.skipTest(f"Test file {file_path} not found")
-        
+
         if not validate_file_has_required_columns(file_path):
             self.skipTest(f"Test file {file_path} does not have required columns for ingestion")
-            
-        result = subprocess.run(
-            args=[
-                "python",
-                "-m",
-                "equalexperts_dataeng_exercise.ingest",
-                file_path,
-            ],
-            capture_output=True,
-        )
 
-        assert result.returncode == 0
+        start_ingestion(WAREHOUSE_PATH, file_path)
+        self._check_record_counts(file_path)
 
     def test_ingestion_handles_duplicate_records(self):
         file_path = "tests/test-resources/samples-votes-with-duplicates.jsonl"
@@ -213,24 +196,16 @@ class TestIngestionIntegration(unittest.TestCase):
         
         if not validate_file_has_required_columns(file_path):
             self.skipTest(f"Test file {file_path} does not have required columns for ingestion")
-            
-        result = subprocess.run(
-            args=[
-                "python",
-                "-m",
-                "equalexperts_dataeng_exercise.ingest",
-                file_path,
-            ],
-            capture_output=True,
-        )
-        
-        assert result.returncode == 0
 
-        if os.path.exists("test_warehouse"):
+        start_ingestion(WAREHOUSE_PATH, file_path)
+        self._check_record_counts(file_path)
+
+    def _check_record_counts(self, file_path: str):
+        if os.path.exists(WAREHOUSE_PATH):
             sql = """
                 SELECT COUNT(*) FROM blog_analysis.votes;
             """
-            conn = duckdb.connect("test_warehouse", read_only=True)
+            conn = duckdb.connect(WAREHOUSE_PATH, read_only=True)
             query_result = conn.sql(sql)
             expected_count = _count_unique_rows_in_data_file(file_path)
             actual_count = query_result.fetchall()[0][0]

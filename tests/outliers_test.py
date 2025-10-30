@@ -3,15 +3,18 @@ import duckdb
 import os
 import unittest
 from unittest.mock import Mock
+
+from equalexperts_dataeng_exercise.ingest import start_ingestion
 from equalexperts_dataeng_exercise.outliers import (
     create_outliers_view,
-    OUTLIER_WEEKS_VIEW_NAME, 
-    OUTLIER_THRESHOLD, 
+    OUTLIER_WEEKS_VIEW_NAME,
+    OUTLIER_THRESHOLD,
     WEEK_NUMBER_MODULO,
     SCHEMA_NAME,
-    MAIN_TABLE_NAME
+    MAIN_TABLE_NAME, compute_outliers
 )
 from equalexperts_dataeng_exercise.db import get_connection, setup_schema_and_table
+from tests.db_test import WAREHOUSE_PATH
 
 
 class TestCreateOutliersView(unittest.TestCase):
@@ -36,16 +39,16 @@ class TestCreateOutliersView(unittest.TestCase):
 class TestOutliersIntegration(unittest.TestCase):
 
     def setUp(self):
-        if os.path.exists("test_warehouse.db"):
-            os.remove("test_warehouse.db")
+        if os.path.exists(WAREHOUSE_PATH):
+            os.remove(WAREHOUSE_PATH)
     
     def tearDown(self):
-        if os.path.exists("test_warehouse.db"):
-            os.remove("test_warehouse.db")
+        if os.path.exists(WAREHOUSE_PATH):
+            os.remove(WAREHOUSE_PATH)
     
     def test_create_outliers_view_creates_view_successfully(self):
         
-        with get_connection() as conn:
+        with get_connection(WAREHOUSE_PATH) as conn:
             setup_schema_and_table(conn)
             
             conn.execute(f"""
@@ -64,7 +67,7 @@ class TestOutliersIntegration(unittest.TestCase):
     
     def test_outliers_view_handles_empty_data(self):
         
-        with get_connection() as conn:
+        with get_connection(WAREHOUSE_PATH) as conn:
             setup_schema_and_table(conn)
             create_outliers_view(conn)
             result = conn.execute(f"SELECT * FROM {SCHEMA_NAME}.{OUTLIER_WEEKS_VIEW_NAME}").fetchall()
@@ -74,36 +77,28 @@ class TestOutliersIntegration(unittest.TestCase):
 class TestOutlierCalculationIntegration(unittest.TestCase):
 
     def setUp(self):
-        if os.path.exists("test_warehouse.db"):
-            os.remove("test_warehouse.db")
+        if os.path.exists(WAREHOUSE_PATH):
+            os.remove(WAREHOUSE_PATH)
 
     def tearDown(self):
-        if os.path.exists("test_warehouse.db"):
-            os.remove("test_warehouse.db")
+        if os.path.exists(WAREHOUSE_PATH):
+            os.remove(WAREHOUSE_PATH)
 
     def test_outlier_calculation_is_correct_for_sample_data(self):
-        ingest_result = subprocess.run(
-            args=[
-                "python",
-                "-m",
-                "equalexperts_dataeng_exercise.ingest",
-                "tests/test-resources/samples-votes.jsonl",
-            ],
-            capture_output=True,
-        )
+        # ingest_result = subprocess.run(
+        #     args=[
+        #         "python",
+        #         "-m",
+        #         "equalexperts_dataeng_exercise.ingest",
+        #         "tests/test-resources/samples-votes.jsonl",
+        #     ],
+        #     capture_output=True,
+        # )
+        start_ingestion(WAREHOUSE_PATH, "tests/test-resources/samples-votes.jsonl")
 
-        assert ingest_result.returncode == 0, f"Ingestion failed: {ingest_result.stderr.decode()}"
+        # assert ingest_result.returncode == 0, f"Ingestion passed: {ingest_result.stderr.decode()}"
 
-        outliers_result = subprocess.run(
-            args=[
-                "python",
-                "-m",
-                "equalexperts_dataeng_exercise.outliers"
-            ],
-            capture_output=True,
-        )
-
-        assert outliers_result.returncode == 0, f"Outliers analysis failed: {outliers_result.stderr.decode()}"
+        compute_outliers(WAREHOUSE_PATH)
 
         sql = "SELECT * FROM blog_analysis.outlier_weeks;"
         con = duckdb.connect("test_warehouse.db", read_only=True)

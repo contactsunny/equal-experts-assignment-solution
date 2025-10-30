@@ -5,8 +5,8 @@ SCHEMA_NAME = "blog_analysis"
 MAIN_TABLE_NAME = "votes"
 
 
-def get_connection():
-    return duckdb.connect(WAREHOUSE_PATH)
+def get_connection(warehouse_path: str):
+    return duckdb.connect(warehouse_path)
 
 def setup_schema_and_table(conn: duckdb.DuckDBPyConnection) -> None:
     conn.sql(f"""
