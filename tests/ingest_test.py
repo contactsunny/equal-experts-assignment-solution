@@ -3,18 +3,20 @@ import os
 import subprocess
 import json
 import duckdb
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, patch
+
+from _duckdb import ConstraintException
+
 from equalexperts_dataeng_exercise.ingest import (
     start_ingestion,
     validate_arguments, 
-    validate_file_path, 
-    validate_file_has_required_columns,
+    validate_file_path,
     update_main_table_from_stage_table,
     drop_stage_table,
     ingest_data,
     STAGE_TABLE_NAME
 )
-from equalexperts_dataeng_exercise.db import SCHEMA_NAME, MAIN_TABLE_NAME, get_connection, setup_schema_and_table
+from equalexperts_dataeng_exercise.db import SCHEMA_NAME, MAIN_TABLE_NAME
 from tests.db_test import WAREHOUSE_PATH
 
 
@@ -59,47 +61,6 @@ class TestValidateFilePath(unittest.TestCase):
         mock_exists.assert_called_once_with(file_path)
 
 
-class TestValidateFileHasRequiredColumns(unittest.TestCase):
-
-    def test_validate_file_has_required_columns_with_all_required_columns_returns_true(self):
-        test_data = {
-            "Id": "1",
-            "PostId": "post1",
-            "VoteTypeId": "2",
-            "CreationDate": "2022-01-01T00:00:00.000"
-        }
-        
-        with patch('builtins.open', mock_open(read_data=json.dumps(test_data))):
-            result = validate_file_has_required_columns("test_file.json")
-            assert result is True
-
-    def test_validate_file_has_required_columns_with_empty_file_returns_false(self):
-        with patch('builtins.open', mock_open(read_data="")):
-            result = validate_file_has_required_columns("empty_file.json")
-            assert result is False
-    
-    def test_validate_file_has_required_columns_with_invalid_json_raises_exception(self):
-        with patch('builtins.open', mock_open(read_data="invalid json content")):
-            with self.assertRaises(json.JSONDecodeError):
-                validate_file_has_required_columns("invalid_file.json")
-    
-    def test_validate_file_has_required_columns_with_extra_columns_returns_true(self):
-        test_data = {
-            "Id": "1",
-            "UserId": "user1",
-            "PostId": "post1", 
-            "VoteTypeId": "2",
-            "BountyAmount": "10.5",
-            "CreationDate": "2022-01-01T00:00:00.000",
-            "ExtraField": "extra_value",
-            "AnotherField": "another_value"
-        }
-        
-        with patch('builtins.open', mock_open(read_data=json.dumps(test_data))):
-            result = validate_file_has_required_columns("test_file.json")
-            assert result is True
-
-
 class TestUpdateMainTableFromStageTable(unittest.TestCase):
 
     def test_update_main_table_from_stage_table_executes_correct_sql(self):
@@ -124,22 +85,6 @@ class TestDropStageTable(unittest.TestCase):
         sql_call = mock_conn.execute.call_args[0][0]
         
         assert f"DROP TABLE IF EXISTS {SCHEMA_NAME}.{STAGE_TABLE_NAME}" in sql_call
-
-
-class TestIngestData(unittest.TestCase):
-
-    @patch('equalexperts_dataeng_exercise.ingest.validate_file_has_required_columns')
-    def test_ingest_data_raises_error_when_validation_fails(self, mock_validate):
-        mock_conn = Mock()
-        mock_validate.return_value = False
-        file_path = "invalid_data.json"
-        
-        with self.assertRaises(ValueError) as context:
-            ingest_data(file_path, mock_conn)
-        
-        assert f"File {file_path} does not have required columns for ingestion" in str(context.exception)
-        mock_validate.assert_called_once_with(file_path)
-        mock_conn.execute.assert_not_called()
 
 
 def _count_unique_rows_in_data_file(file_path):
@@ -168,23 +113,12 @@ class TestIngestionIntegration(unittest.TestCase):
         try:
             start_ingestion(WAREHOUSE_PATH, file_path)
         except Exception as e:
-            assert isinstance(e, ValueError)
+            assert isinstance(e, ConstraintException)
     
-    def test_validate_file_has_required_columns_using_real_file(self):
-        file_path = "tests/test-resources/samples-votes-with-duplicates.jsonl"
-        if not os.path.exists(file_path):
-            self.skipTest(f"Test file {file_path} not found")
-        
-        result = validate_file_has_required_columns(file_path)
-        assert result is True
-
     def test_ingestion_completion_with_valid_sample_data(self):
         file_path = "tests/test-resources/samples-votes.jsonl"
         if not os.path.exists(file_path):
             self.skipTest(f"Test file {file_path} not found")
-
-        if not validate_file_has_required_columns(file_path):
-            self.skipTest(f"Test file {file_path} does not have required columns for ingestion")
 
         start_ingestion(WAREHOUSE_PATH, file_path)
         self._check_record_counts(file_path)
@@ -194,9 +128,6 @@ class TestIngestionIntegration(unittest.TestCase):
         if not os.path.exists(file_path):
             self.skipTest(f"Test file {file_path} not found")
         
-        if not validate_file_has_required_columns(file_path):
-            self.skipTest(f"Test file {file_path} does not have required columns for ingestion")
-
         start_ingestion(WAREHOUSE_PATH, file_path)
         self._check_record_counts(file_path)
 

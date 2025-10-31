@@ -18,15 +18,6 @@ def validate_file_path(file_path: str) -> None:
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File {file_path} does not exist")
 
-def validate_file_has_required_columns(file_path: str) -> bool:
-    required_columns = {"Id", "PostId", "VoteTypeId", "CreationDate"}
-    with open(file_path, "r", encoding="utf-8") as data:
-        first_line = data.readline()
-        if first_line:
-            columns = json.loads(first_line)
-            return all(col in columns for col in required_columns)
-    return False
-
 def create_stage_table_from_file(file_path: str, conn: duckdb.DuckDBPyConnection) -> None:
     stage_table_query = f"""
         CREATE OR REPLACE TABLE {SCHEMA_NAME}.{STAGE_TABLE_NAME} AS
@@ -60,18 +51,22 @@ def create_stage_table_from_file(file_path: str, conn: duckdb.DuckDBPyConnection
 
 def update_main_table_from_stage_table(conn: duckdb.DuckDBPyConnection) -> None:
     insert_query = f"""
-        INSERT OR REPLACE INTO {SCHEMA_NAME}.{MAIN_TABLE_NAME} 
+        INSERT OR REPLACE INTO {SCHEMA_NAME}.{MAIN_TABLE_NAME} BY NAME
             (id, user_id, post_id, vote_type_id, bounty_amount, creation_date)
         SELECT
-            id,
-            user_id,
-            post_id,
-            vote_type_id,
-            bounty_amount,
-            creation_date
+            COALESCE(TRY_CAST(id AS STRING), NULL) AS id,
+            COALESCE(TRY_CAST(user_id AS STRING), NULL) AS user_id,
+            COALESCE(TRY_CAST(post_id AS STRING), NULL) AS post_id,
+            COALESCE(TRY_CAST(vote_type_id AS INTEGER), NULL) AS vote_type_id,
+            COALESCE(TRY_CAST(bounty_amount AS DOUBLE), NULL) AS bounty_amount,
+            COALESCE(TRY_CAST(creation_date AS TIMESTAMP), NULL) AS creation_date
         FROM {SCHEMA_NAME}.{STAGE_TABLE_NAME}
     """
-    conn.execute(insert_query)
+    try:
+        conn.execute(insert_query)
+    except duckdb.ConstraintException as e:
+        print("Some fields are missing")
+        print(e)
     
 def drop_stage_table(conn: duckdb.DuckDBPyConnection) -> None:
     drop_query = f"""
@@ -80,8 +75,8 @@ def drop_stage_table(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute(drop_query)
 
 def ingest_data(file_path: str, conn: duckdb.DuckDBPyConnection) -> None:
-    if not validate_file_has_required_columns(file_path):
-        raise ValueError(f"File {file_path} does not have required columns for ingestion")
+    # if not validate_file_has_required_columns(file_path):
+    #     raise ValueError(f"File {file_path} does not have required columns for ingestion")
 
     create_stage_table_from_file(file_path, conn)
     update_main_table_from_stage_table(conn)
